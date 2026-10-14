@@ -81,8 +81,8 @@ function auth(m){var reg=m==='up';$('header').hidden=true;$('#nav').innerHTML=''
  $('#main').innerHTML='<div class="card"><h2>'+(reg?'Criar conta':'Entrar')+'</h2><form id="fa" style="margin-top:12px">'+
  (reg?'<label>Nome<input name="n" maxlength="30" required autocomplete="name"></label>':'')+
  '<label>E-mail<input name="e" type="email" required autocomplete="email"></label>'+
- '<label>Senha (mínimo 6 caracteres)<input name="p" type="password" minlength="6" required autocomplete="'+(reg?'new-password':'current-password')+'"></label>'+
- (reg?'<label>Confirmar senha<input name="p2" type="password" minlength="6" required autocomplete="new-password"></label>':'')+
+ '<label>Senha (mínimo 8 caracteres)<input name="p" type="password" minlength="8" required autocomplete="'+(reg?'new-password':'current-password')+'"></label>'+
+ (reg?'<label>Confirmar senha<input name="p2" type="password" minlength="8" required autocomplete="new-password"></label>':'')+
  '<div id="er" class="neg" role="alert"></div><button class="btn">'+(reg?'Criar conta':'Entrar')+'</button></form>'+
  '<p class="muted">'+(reg?'Já tem conta? <a href="#" id="sw">Entrar</a>':'Novo por aqui? <a href="#" id="sw">Criar conta</a>')+'</p>'+
  (sb?'':'<p class="neg">Backend não configurado: preencha SB_URL e SB_KEY no início do script (veja o LEIAME). Por enquanto só o modo visitante funciona.</p>')+
