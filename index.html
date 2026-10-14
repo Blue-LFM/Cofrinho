@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cofrinho+ - educação financeira gamificada</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#EEF5F0;--surface:#fff;--ink:#12231D;--muted:#5B6B64;--brand:#0F5C48;--on-brand:#fff;--coin:#FFC83D;--pink:#D93A62;--line:#D5E2DA;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0E1A16;--surface:#16261F;--ink:#EAF3EE;--muted:#9BB0A6;--brand:#3FCB9F;--on-brand:#0E1A16;--pink:#FF7D9A;--line:#264036}}
+:root[data-theme="dark"]{--bg:#0E1A16;--surface:#16261F;--ink:#EAF3EE;--muted:#9BB0A6;--brand:#3FCB9F;--on-brand:#0E1A16;--pink:#FF7D9A;--line:#264036}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "DM Sans",system-ui,sans-serif}
+h1,h2,h3,.big{font-family:"Bricolage Grotesque","DM Sans",system-ui,sans-serif;margin:0}
+.wrap{max-width:760px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.logo{font-size:26px;font-weight:800;color:var(--brand)}
+.lv{flex:1;min-width:220px}
+.lv b{display:flex;justify-content:space-between;font-size:14px}
+.bar{height:12px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;background:var(--coin);border-radius:99px;transition:width .4s}
+.coin{width:34px;height:34px;border-radius:50%;background:var(--coin);color:#3a2a00;font:800 18px "Bricolage Grotesque",sans-serif;display:grid;place-items:center}
+nav{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px}
+nav button{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:99px;font:inherit;font-weight:500;cursor:pointer}
+nav button[aria-current="true"]{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
+.big{font-size:44px;font-weight:800;line-height:1.1}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>*{flex:1;min-width:130px}
+.muted{color:var(--muted);font-size:14px}
+.pos{color:var(--brand)}.neg{color:var(--pink)}
+label{display:block;font-size:14px;font-weight:500;margin-bottom:8px}
+input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;margin-top:4px}
+.btn{border:0;background:var(--brand);color:var(--on-brand);padding:10px 16px;border-radius:10px;font:inherit;font-weight:700;cursor:pointer}
+.btn.alt{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:3px solid var(--coin);outline-offset:2px}
+.cat{display:grid;grid-template-columns:100px 1fr 90px;gap:8px;align-items:center;font-size:14px;margin:6px 0}
+.cat .bar{margin:0}.cat .bar i{background:var(--brand)}
+.item{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border:0}
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.bd{border:1px dashed var(--line);border-radius:12px;padding:12px;opacity:.55}
+.bd.on{opacity:1;border:2px solid var(--coin)}
+.msg{background:var(--brand);color:var(--on-brand);padding:10px 14px;border-radius:10px;margin-bottom:12px}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+ <div class="logo">Cofrinho+</div>
+ <div class="lv"><b><span id="lvn"></span><span id="xpt"></span></b><div class="bar"><i id="xpb"></i></div></div>
+ <div class="coin" id="coin">1</div>
+ <div id="who" class="muted"></div>
+</header>
+<nav id="nav"></nav>
+<div id="msg" role="status"></div>
+<main id="main"></main>
+<p class="muted">Protótipo acadêmico. Os dados ficam só neste navegador.</p>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+var SB_URL='COLE_AQUI_A_URL_DO_PROJETO',SB_KEY='COLE_AQUI_A_ANON_KEY';
+var K='cofrinho-v1',S,tab='resumo',sb=null,UID=null,UN='',tm=null;
+function blank(){return{tx:[],goals:[],xp:0,claimed:[],sim:false,dep:false}}
+try{if(window.supabase&&SB_URL.indexOf('http')===0)sb=supabase.createClient(SB_URL,SB_KEY)}catch(e){}
+function rd(k,d){try{var r=localStorage.getItem(k);return r?JSON.parse(r):d}catch(e){return d}}
+function wr(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function save(){if(sb&&UID){clearTimeout(tm);tm=setTimeout(function(){sb.from('estado').upsert({user_id:UID,dados:S,atualizado:new Date().toISOString()}).then(function(r){if(r.error)say('Não foi possível sincronizar: '+esc(r.error.message))})},600)}else wr(K,S)}
+function out(){(sb&&UID?sb.auth.signOut():Promise.resolve()).then(function(){UID=null;wr('cofrinho-session',null);tab='resumo';auth('in')})}
+function enter(u){UID=u.id;UN=(u.user_metadata&&u.user_metadata.nome)||u.email;
+ sb.from('estado').select('dados').eq('user_id',UID).maybeSingle().then(function(r){S=Object.assign(blank(),r.data?r.data.dados:{});render()})}
+function guest(){wr('cofrinho-session','__guest');guestOrAuth()}
+function guestOrAuth(){if(rd('cofrinho-session',null)==='__guest'){UID=null;S=Object.assign(blank(),rd(K,{}));render()}else auth('in')}
+function start(){if(!sb){guestOrAuth();return}
+ sb.auth.getSession().then(function(r){var u=r.data.session&&r.data.session.user;if(u)enter(u);else guestOrAuth()})}
+function auth(m){var reg=m==='up';$('header').hidden=true;$('#nav').innerHTML='';
+ $('#main').innerHTML='<div class="card"><h2>'+(reg?'Criar conta':'Entrar')+'</h2><form id="fa" style="margin-top:12px">'+
+ (reg?'<label>Nome<input name="n" maxlength="30" required autocomplete="name"></label>':'')+
+ '<label>E-mail<input name="e" type="email" required autocomplete="email"></label>'+
+ '<label>Senha (mínimo 6 caracteres)<input name="p" type="password" minlength="6" required autocomplete="'+(reg?'new-password':'current-password')+'"></label>'+
+ (reg?'<label>Confirmar senha<input name="p2" type="password" minlength="6" required autocomplete="new-password"></label>':'')+
+ '<div id="er" class="neg" role="alert"></div><button class="btn">'+(reg?'Criar conta':'Entrar')+'</button></form>'+
+ '<p class="muted">'+(reg?'Já tem conta? <a href="#" id="sw">Entrar</a>':'Novo por aqui? <a href="#" id="sw">Criar conta</a>')+'</p>'+
+ (sb?'':'<p class="neg">Backend não configurado: preencha SB_URL e SB_KEY no início do script (veja o LEIAME). Por enquanto só o modo visitante funciona.</p>')+
+ '<button class="btn alt" id="gs">Continuar sem conta (dados só neste aparelho)</button></div>';
+ $('#sw').onclick=function(e){e.preventDefault();auth(reg?'in':'up')};
+ $('#gs').onclick=guest;
+ $('#fa').onsubmit=function(e){e.preventDefault();var d=new FormData(this),em=d.get('e').trim(),p=d.get('p'),er=$('#er');
+  if(!sb){er.textContent='Configure o Supabase primeiro.';return}
+  if(reg){if(p!==d.get('p2')){er.textContent='As senhas não conferem.';return}
+   sb.auth.signUp({email:em,password:p,options:{data:{nome:d.get('n').trim()}}}).then(function(r){
+    if(r.error){er.textContent=r.error.message;return}
+    if(r.data.session)enter(r.data.user);else er.textContent='Conta criada. Confirme o e-mail que enviamos e depois entre.'})}
+  else sb.auth.signInWithPassword({email:em,password:p}).then(function(r){
+   if(r.error){er.textContent='E-mail ou senha incorretos.';return}enter(r.data.user)})}}
+function brl(n){return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function $(s){return document.querySelector(s)}
+var CATS=['Alimentação','Transporte','Lazer','Estudos','Moradia','Compras','Outros'];
+var LV=[['Iniciante',0],['Consciente',100],['Estrategista',300],['Mestre das Finanças',600]];
+function lvl(){var i=0;LV.forEach(function(l,k){if(S.xp>=l[1])i=k});return i}
+function sum(t){return S.tx.filter(function(x){return x.t===t}).reduce(function(a,x){return a+x.v},0)}
+function gc(c){return S.tx.filter(function(x){return x.t==='g'&&x.c===c}).reduce(function(a,x){return a+x.v},0)}
+var MS=[
+ {id:'m1',n:'Registre 5 lançamentos',xp:30,ok:function(){return S.tx.length>=5},p:function(){return Math.min(S.tx.length,5)+'/5'}},
+ {id:'m2',n:'Faça um depósito em uma meta',xp:30,ok:function(){return S.dep},p:function(){return S.dep?'1/1':'0/1'}},
+ {id:'m3',n:'Mantenha o lazer abaixo de 20% da renda (com 3+ lançamentos)',xp:40,ok:function(){return S.tx.length>=3&&sum('r')>0&&gc('Lazer')<=sum('r')*.2},p:function(){return sum('r')>0?Math.round(gc('Lazer')/sum('r')*100)+'% da renda':'sem renda'}},
+ {id:'m4',n:'Teste o simulador',xp:20,ok:function(){return S.sim},p:function(){return S.sim?'1/1':'0/1'}}
+];
+var BD=[
+ ['Primeiro passo','Registrou o primeiro lançamento',function(){return S.tx.length>=1}],
+ ['Organizado','Registrou 10 lançamentos',function(){return S.tx.length>=10}],
+ ['Poupador','Completou uma meta',function(){return S.goals.some(function(g){return g.atual>=g.alvo})}],
+ ['Estudioso','Concluiu 3 missões',function(){return S.claimed.length>=3}],
+ ['Estrategista','Chegou ao nível Estrategista',function(){return lvl()>=2}]
+];
+function say(t){$('#msg').innerHTML=t?'<div class="msg">'+t+'</div>':'';if(t)setTimeout(function(){$('#msg').innerHTML=''},3500)}
+function addXp(n,why){var a=lvl();S.xp+=n;save();say('+'+n+' XP: '+why+(lvl()>a?'. Você subiu para '+LV[lvl()][0]+'!':''))}
+function head(){$('header').hidden=false;$('#who').innerHTML=(UID?esc(UN):'Visitante')+' <button class="btn alt" onclick="out()">Sair</button>';var i=lvl(),c=LV[i][1],nx=LV[i+1];
+ $('#lvn').textContent='Nível '+(i+1)+': '+LV[i][0];
+ $('#xpt').textContent=nx?S.xp+' / '+nx[1]+' XP':S.xp+' XP (máximo)';
+ $('#xpb').style.width=(nx?Math.min(100,(S.xp-c)/(nx[1]-c)*100):100)+'%';
+ $('#coin').textContent=i+1}
+var TABS=[['resumo','Resumo'],['lanc','Lançamentos'],['metas','Metas'],['missoes','Missões'],['sim','Simulador'],['conq','Conquistas']];
+function nav(){$('#nav').innerHTML=TABS.map(function(t){return '<button data-t="'+t[0]+'" aria-current="'+(tab===t[0])+'">'+t[1]+'</button>'}).join('')}
+$('#nav').onclick=function(e){var t=e.target.getAttribute('data-t');if(t){tab=t;render()}};
+function today(){return new Date().toISOString().slice(0,10)}
+function opts(a){return a.map(function(c){return '<option>'+c+'</option>'}).join('')}
+function vResumo(){
+ var r=sum('r'),g=sum('g'),mx=Math.max.apply(null,CATS.map(gc).concat([1]));
+ var h='<div class="card"><div class="muted">Saldo atual</div><div class="big '+(r-g>=0?'pos':'neg')+'">'+brl(r-g)+'</div>'+
+ '<div class="row" style="margin-top:12px"><div><div class="muted">Receitas</div><b class="pos">'+brl(r)+'</b></div><div><div class="muted">Gastos</div><b class="neg">'+brl(g)+'</b></div></div></div>';
+ h+='<div class="card"><h3>Para onde vai o dinheiro</h3>';
+ if(!g)h+='<p class="muted">Sem gastos ainda. Registre um lançamento para ver o gráfico.</p>';
+ CATS.forEach(function(c){var v=gc(c);if(v)h+='<div class="cat"><span>'+c+'</span><div class="bar"><i style="width:'+v/mx*100+'%"></i></div><span>'+brl(v)+'</span></div>'});
+ h+='</div>';
+ if(!S.tx.length)h+='<button class="btn alt" onclick="demo()">Carregar dados de exemplo</button>';
+ return h}
+function demo(){var d=today();
+ S.tx=[{id:1,t:'r',v:1200,c:'Outros',d:d,n:'Estágio'},{id:2,t:'g',v:380,c:'Moradia',d:d,n:'Aluguel (parte)'},{id:3,t:'g',v:210,c:'Alimentação',d:d,n:'Mercado'},{id:4,t:'g',v:90,c:'Lazer',d:d,n:'Cinema e lanche'},{id:5,t:'g',v:120,c:'Transporte',d:d,n:'Ônibus'}];
+ S.goals=[{id:1,n:'Notebook',alvo:2500,atual:300}];save();render()}
+function vLanc(){
+ var h='<div class="card"><h3>Novo lançamento</h3><form id="f"><div class="row"><label>Tipo<select name="t"><option value="g">Gasto</option><option value="r">Receita</option></select></label><label>Valor (R$)<input name="v" type="number" step="0.01" min="0.01" required></label></div>'+
+ '<div class="row"><label>Categoria<select name="c">'+opts(CATS)+'</select></label><label>Descrição<input name="n" maxlength="40" placeholder="Ex.: almoço"></label></div><button class="btn">Salvar lançamento</button></form></div>';
+ h+='<div class="card"><h3>Histórico</h3>';
+ if(!S.tx.length)h+='<p class="muted">Nenhum lançamento. Cada registro vale 10 XP.</p>';
+ S.tx.slice().reverse().forEach(function(x){h+='<div class="item"><div>'+esc(x.n||x.c)+'<div class="muted">'+x.c+' - '+x.d+'</div></div><div><b class="'+(x.t==='r'?'pos':'neg')+'">'+(x.t==='r'?'+':'-')+brl(x.v)+'</b> <button class="btn alt" aria-label="Excluir lançamento" onclick="delTx('+x.id+')">Excluir</button></div></div>'});
+ return h+'</div>'}
+function delTx(id){S.tx=S.tx.filter(function(x){return x.id!==id});save();render()}
+function vMetas(){
+ var h='<div class="card"><h3>Nova meta</h3><form id="fg"><div class="row"><label>Nome<input name="n" maxlength="30" placeholder="Ex.: notebook" required></label><label>Valor alvo (R$)<input name="a" type="number" min="1" step="0.01" required></label></div><button class="btn">Criar meta</button></form></div>';
+ if(!S.goals.length)h+='<p class="muted">Crie sua primeira meta de economia.</p>';
+ S.goals.forEach(function(g){var p=Math.min(100,g.atual/g.alvo*100),ok=g.atual>=g.alvo;
+  h+='<div class="card"><div class="item" style="border:0;padding:0"><h3>'+esc(g.n)+(ok?' (concluída)':'')+'</h3><span>'+brl(g.atual)+' / '+brl(g.alvo)+'</span></div><div class="bar"><i style="width:'+p+'%"></i></div>'+
+  (ok?'':'<form class="dep" data-id="'+g.id+'" style="display:flex;gap:8px;margin-top:10px"><input name="v" type="number" min="0.01" step="0.01" placeholder="Valor a guardar" aria-label="Valor a guardar" required><button class="btn">Guardar</button></form>')+'</div>'});
+ return h}
+function vMiss(){
+ var h='<p class="muted">Missões de hoje. Conclua e resgate o XP.</p>';
+ MS.forEach(function(m){var done=S.claimed.indexOf(m.id)>-1,ok=m.ok();
+  h+='<div class="card item"><div><b>'+m.n+'</b><div class="muted">Progresso: '+m.p()+' - '+m.xp+' XP</div></div><button class="btn" '+(done||!ok?'disabled':'')+' onclick="claim(\''+m.id+'\')">'+(done?'Resgatada':ok?'Resgatar':'Em andamento')+'</button></div>'});
+ return h}
+function claim(id){var m=MS.filter(function(x){return x.id===id})[0];if(S.claimed.indexOf(id)>-1||!m.ok())return;S.claimed.push(id);addXp(m.xp,'missão concluída');render()}
+function vSim(){
+ return '<div class="card"><h3>Quanto vou ter?</h3><div class="row"><label>Guardo por mês (R$)<input id="sm" type="number" min="1" value="50"></label><label>Meses<input id="sn" type="number" min="1" max="600" value="12"></label><label>Rendimento ao mês (%)<input id="st" type="number" min="0" step="0.1" value="0.8"></label></div><button class="btn" onclick="calc()">Calcular</button><div id="sr" style="margin-top:14px"></div><p class="muted">Simulação educativa com taxa fixa informada por você. Não é recomendação de investimento.</p></div>'}
+function calc(){var m=+$('#sm').value,n=+$('#sn').value,t=+$('#st').value/100;if(!(m>0&&n>0))return;
+ var f=t?m*((Math.pow(1+t,n)-1)/t):m*n,inv=m*n;
+ $('#sr').innerHTML='<div class="muted">Em '+n+' meses você teria</div><div class="big pos">'+brl(f)+'</div><div class="muted">Você guardou '+brl(inv)+' e o rendimento somou '+brl(f-inv)+'.</div>';
+ if(!S.sim){S.sim=true;addXp(10,'primeira simulação')}}
+function vConq(){
+ return '<div class="badges">'+BD.map(function(b){var on=b[2]();return '<div class="bd'+(on?' on':'')+'"><b>'+b[0]+'</b><div class="muted">'+b[1]+'</div>'+(on?'<div class="pos">Conquistada</div>':'')+'</div>'}).join('')+'</div>'}
+function render(){head();nav();
+ $('#main').innerHTML={resumo:vResumo,lanc:vLanc,metas:vMetas,missoes:vMiss,sim:vSim,conq:vConq}[tab]();
+ var f=$('#f');if(f)f.onsubmit=function(e){e.preventDefault();var d=new FormData(f);
+  S.tx.push({id:Date.now(),t:d.get('t'),v:+d.get('v'),c:d.get('c'),d:today(),n:d.get('n')});save();addXp(10,'lançamento registrado');render()};
+ var fg=$('#fg');if(fg)fg.onsubmit=function(e){e.preventDefault();var d=new FormData(fg);
+  S.goals.push({id:Date.now(),n:d.get('n'),alvo:+d.get('a'),atual:0});save();render()};
+ document.querySelectorAll('.dep').forEach(function(f){f.onsubmit=function(e){e.preventDefault();
+  var g=S.goals.filter(function(x){return x.id==f.getAttribute('data-id')})[0],v=+new FormData(f).get('v'),was=g.atual>=g.alvo;
+  g.atual+=v;S.dep=true;save();render();addXp(g.atual>=g.alvo&&!was?50:5,g.atual>=g.alvo&&!was?'meta concluída':'depósito na meta')}})}
+start();
+</script>
+</body>
+</html>
