@@ -69,7 +69,7 @@ function blank(){return{tx:[],goals:[],xp:0,claimed:[],sim:false,dep:false}}
 try{if(window.supabase&&SB_URL.indexOf('http')===0)sb=supabase.createClient(SB_URL,SB_KEY)}catch(e){}
 function rd(k,d){try{var r=localStorage.getItem(k);return r?JSON.parse(r):d}catch(e){return d}}
 function wr(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
-function save(){if(sb&&UID){clearTimeout(tm);tm=setTimeout(function(){sb.from('estado').upsert({user_id:UID,dados:S,atualizado:new Date().toISOString()}).then(function(r){if(r.error)say('Não foi possível sincronizar: '+esc(r.error.message))})},600)}else wr(K,S)}
+function save(){wr(K,S);if(sb&&UID){clearTimeout(tm);tm=setTimeout(function(){sb.from('estado').upsert({user_id:UID,dados:S,atualizado:new Date().toISOString()}).then(function(r){if(r.error)alert('Erro ao salvar na nuvem: '+r.error.message)})},600)}}
 function out(){(sb&&UID?sb.auth.signOut():Promise.resolve()).then(function(){UID=null;wr('cofrinho-session',null);tab='resumo';auth('in')})}
 function enter(u){UID=u.id;UN=(u.user_metadata&&u.user_metadata.nome)||u.email;
  sb.from('estado').select('dados').eq('user_id',UID).maybeSingle().then(function(r){S=Object.assign(blank(),r.data?r.data.dados:{});render()})}
