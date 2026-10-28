@@ -59,20 +59,22 @@ input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:
 <nav id="nav"></nav>
 <div id="msg" role="status"></div>
 <main id="main"></main>
-<p class="muted">Protótipo acadêmico.</p>
+<p class="muted">Protótipo acadêmico. Os dados ficam só neste navegador.</p>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
 var SB_URL='https://nfesujtklvdveetcdiso.supabase.co',SB_KEY='sb_publishable_nU5UeDo5tLo94OXe8KOaNA_GnVldsNL';
 var K='cofrinho-v1',S,tab='resumo',sb=null,UID=null,UN='',tm=null;
-function blank(){return{tx:[],goals:[],xp:0,claimed:[],sim:false,dep:false}}
+function blank(){return{tx:[],goals:[],xp:0,claimed:[],sim:false,dep:false,lim:{}}}
 try{if(window.supabase&&SB_URL.indexOf('http')===0)sb=supabase.createClient(SB_URL,SB_KEY)}catch(e){}
 function rd(k,d){try{var r=localStorage.getItem(k);return r?JSON.parse(r):d}catch(e){return d}}
 function wr(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
-function save(){wr(K,S);if(sb&&UID){clearTimeout(tm);tm=setTimeout(function(){sb.from('estado').upsert({user_id:UID,dados:S,atualizado:new Date().toISOString()}).then(function(r){if(r.error)alert('Erro ao salvar na nuvem: '+r.error.message)})},600)}}
+var pend=false;
+function save(){if(sb&&UID){pend=true;clearTimeout(tm);tm=setTimeout(function(){sb.from('estado').upsert({user_id:UID,dados:S,atualizado:new Date().toISOString()}).then(function(r){pend=false;if(r.error)alert('Erro ao salvar na nuvem: '+r.error.message)})},600)}else wr(K,S)}
+function refresh(){sb.from('estado').select('dados').eq('user_id',UID).maybeSingle().then(function(r){if(r.error||pend)return;S=Object.assign(blank(),r.data?r.data.dados:{});render()})}
 function out(){(sb&&UID?sb.auth.signOut():Promise.resolve()).then(function(){UID=null;wr('cofrinho-session',null);tab='resumo';auth('in')})}
 function enter(u){UID=u.id;UN=(u.user_metadata&&u.user_metadata.nome)||u.email;
- sb.from('estado').select('dados').eq('user_id',UID).maybeSingle().then(function(r){S=Object.assign(blank(),r.data?r.data.dados:{});render()})}
+ sb.from('estado').select('dados').eq('user_id',UID).maybeSingle().then(function(r){if(r.error){UID=null;alert('Erro ao carregar da nuvem: '+r.error.message);auth('in');return}S=Object.assign(blank(),r.data?r.data.dados:{});render()})}
 function guest(){wr('cofrinho-session','__guest');guestOrAuth()}
 function guestOrAuth(){if(rd('cofrinho-session',null)==='__guest'){UID=null;S=Object.assign(blank(),rd(K,{}));render()}else auth('in')}
 function start(){if(!sb){guestOrAuth();return}
@@ -81,7 +83,7 @@ function auth(m){var reg=m==='up';$('header').hidden=true;$('#nav').innerHTML=''
  $('#main').innerHTML='<div class="card"><h2>'+(reg?'Criar conta':'Entrar')+'</h2><form id="fa" style="margin-top:12px">'+
  (reg?'<label>Nome<input name="n" maxlength="30" required autocomplete="name"></label>':'')+
  '<label>E-mail<input name="e" type="email" required autocomplete="email"></label>'+
- '<label>Senha (mínimo 8 caracteres)<input name="p" type="password" minlength="8" required autocomplete="'+(reg?'new-password':'current-password')+'"></label>'+
+ '<label>Senha'+(reg?' (mínimo 8 caracteres)':'')+'<input name="p" type="password"'+(reg?' minlength="8"':'')+' required autocomplete="'+(reg?'new-password':'current-password')+'"></label>'+
  (reg?'<label>Confirmar senha<input name="p2" type="password" minlength="8" required autocomplete="new-password"></label>':'')+
  '<div id="er" class="neg" role="alert"></div><button class="btn">'+(reg?'Criar conta':'Entrar')+'</button></form>'+
  '<p class="muted">'+(reg?'Já tem conta? <a href="#" id="sw">Entrar</a>':'Novo por aqui? <a href="#" id="sw">Criar conta</a>')+'</p>'+
@@ -118,33 +120,91 @@ var BD=[
  ['Estudioso','Concluiu 3 missões',function(){return S.claimed.length>=3}],
  ['Estrategista','Chegou ao nível Estrategista',function(){return lvl()>=2}]
 ];
-function say(t){$('#msg').innerHTML=t?'<div class="msg">'+t+'</div>':'';if(t)setTimeout(function(){$('#msg').innerHTML=''},3500)}
+var mt;function say(t,ms,w){clearTimeout(mt);$('#msg').innerHTML=t?'<div class="msg"'+(w?' style="background:#B3263F;color:#fff"':'')+' role="alert">'+t+'</div>':'';if(t)mt=setTimeout(function(){$('#msg').innerHTML=''},ms||3500)}
+function warn(t){say(t,8000,true)}
 function addXp(n,why){var a=lvl();S.xp+=n;save();say('+'+n+' XP: '+why+(lvl()>a?'. Você subiu para '+LV[lvl()][0]+'!':''))}
 function head(){$('header').hidden=false;$('#who').innerHTML=(UID?esc(UN):'Visitante')+' <button class="btn alt" onclick="out()">Sair</button>';var i=lvl(),c=LV[i][1],nx=LV[i+1];
  $('#lvn').textContent='Nível '+(i+1)+': '+LV[i][0];
  $('#xpt').textContent=nx?S.xp+' / '+nx[1]+' XP':S.xp+' XP (máximo)';
  $('#xpb').style.width=(nx?Math.min(100,(S.xp-c)/(nx[1]-c)*100):100)+'%';
  $('#coin').textContent=i+1}
-var TABS=[['resumo','Resumo'],['lanc','Lançamentos'],['metas','Metas'],['missoes','Missões'],['sim','Simulador'],['conq','Conquistas']];
+var TABS=[['resumo','Resumo'],['lanc','Lançamentos'],['metas','Metas'],['limites','Limites'],['missoes','Missões'],['sim','Simulador'],['conq','Conquistas']];
 function nav(){$('#nav').innerHTML=TABS.map(function(t){return '<button data-t="'+t[0]+'" aria-current="'+(tab===t[0])+'">'+t[1]+'</button>'}).join('')}
 $('#nav').onclick=function(e){var t=e.target.getAttribute('data-t');if(t){tab=t;render()}};
-function today(){return new Date().toISOString().slice(0,10)}
+function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function opts(a){return a.map(function(c){return '<option>'+c+'</option>'}).join('')}
+var MES=today().slice(0,7);
+function mTx(t,c){return S.tx.filter(function(x){return x.t===t&&x.d.slice(0,7)===MES&&(!c||x.c===c)}).reduce(function(a,x){return a+x.v},0)}
+function mesNome(m){var p=m.split('-');return new Date(+p[0],+p[1]-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'})}
+function lims(){return CATS.filter(function(c){return S.lim&&S.lim[c]>0}).map(function(c){var v=mTx('g',c),l=S.lim[c];return{c:c,s:v,l:l,p:v/l}})}
 function vResumo(){
- var r=sum('r'),g=sum('g'),mx=Math.max.apply(null,CATS.map(gc).concat([1]));
- var h='<div class="card"><div class="muted">Saldo atual</div><div class="big '+(r-g>=0?'pos':'neg')+'">'+brl(r-g)+'</div>'+
- '<div class="row" style="margin-top:12px"><div><div class="muted">Receitas</div><b class="pos">'+brl(r)+'</b></div><div><div class="muted">Gastos</div><b class="neg">'+brl(g)+'</b></div></div></div>';
+ var r=mTx('r'),g=mTx('g'),mx=Math.max.apply(null,CATS.map(function(c){return mTx('g',c)}).concat([1]));
+ var h='<div class="card"><label>Mês<input type="month" id="mes" value="'+MES+'" onchange="if(this.value){MES=this.value;render()}"></label><div class="muted">Saldo de '+mesNome(MES)+'</div><div class="big '+(r-g>=0?'pos':'neg')+'">'+brl(r-g)+'</div>'+
+ '<div class="row" style="margin-top:12px"><div><div class="muted">Receitas</div><b class="pos">'+brl(r)+'</b></div><div><div class="muted">Gastos</div><b class="neg">'+brl(g)+'</b></div><div><div class="muted">Saldo acumulado</div><b>'+brl(sum('r')-sum('g'))+'</b></div></div></div>';
+ var al=lims().filter(function(x){return x.p>=.8});
+ if(al.length)h+='<div class="card" role="alert"><h3>Alertas de limite</h3>'+al.map(function(x){return '<p class="'+(x.p>=1?'neg':'')+'"><b>'+x.c+'</b>: '+brl(x.s)+' de '+brl(x.l)+' ('+Math.round(x.p*100)+'%) - '+(x.p>=1?'limite estourado':'perto do limite')+'</p>'}).join('')+'</div>';
  h+='<div class="card"><h3>Para onde vai o dinheiro</h3>';
- if(!g)h+='<p class="muted">Sem gastos ainda. Registre um lançamento para ver o gráfico.</p>';
- CATS.forEach(function(c){var v=gc(c);if(v)h+='<div class="cat"><span>'+c+'</span><div class="bar"><i style="width:'+v/mx*100+'%"></i></div><span>'+brl(v)+'</span></div>'});
+ if(!g)h+='<p class="muted">Sem gastos neste mês.</p>';
+ CATS.forEach(function(c){var v=mTx('g',c);if(v)h+='<div class="cat"><span>'+c+'</span><div class="bar"><i style="width:'+v/mx*100+'%"></i></div><span>'+brl(v)+'</span></div>'});
  h+='</div>';
  if(!S.tx.length)h+='<button class="btn alt" onclick="demo()">Carregar dados de exemplo</button>';
  return h}
+function vLimites(){
+ var h='<div class="card"><h3>Definir limite mensal</h3><p class="muted">Você recebe um aviso ao chegar em 80% e ao passar do limite.</p><form id="fl" style="margin-top:12px"><div class="row"><label>Categoria<select name="c">'+opts(CATS)+'</select></label><label>Limite por mês (R$)<input name="v" type="number" min="1" step="0.01" required></label></div><button class="btn">Salvar limite</button></form></div>';
+ var L=lims();
+ if(!L.length)h+='<p class="muted">Nenhum limite definido ainda.</p>';
+ L.forEach(function(x){var col=x.p>=1?'var(--pink)':x.p>=.8?'var(--coin)':'var(--brand)';
+  h+='<div class="card"><div class="item" style="border:0;padding:0"><h3>'+x.c+'</h3><span>'+brl(x.s)+' / '+brl(x.l)+'</span></div><div class="bar"><i style="width:'+Math.min(100,x.p*100)+'%;background:'+col+'"></i></div><div class="item" style="border:0;padding:8px 0 0"><span class="muted">'+Math.round(x.p*100)+'% usado em '+mesNome(MES)+'</span><button class="btn alt" onclick="delLim(\''+x.c+'\')">Remover</button></div></div>'});
+ return h}
+function delLim(c){delete S.lim[c];save();render()}
+function chk(t,c,v){if(t!=='g'||!S.lim||!S.lim[c])return;var l=S.lim[c],m=today().slice(0,7),sp=S.tx.filter(function(x){return x.t==='g'&&x.c===c&&x.d.slice(0,7)===m}).reduce(function(a,x){return a+x.v},0),b=sp-v;
+ if(sp>l&&b<=l)warn('Limite de '+c+' estourado: '+brl(sp)+' de '+brl(l)+'.');else if(sp>=l*.8&&b<l*.8)warn('Atenção: você já usou '+Math.round(sp/l*100)+'% do limite de '+c+'.')}
 function demo(){var d=today();
  S.tx=[{id:1,t:'r',v:1200,c:'Outros',d:d,n:'Estágio'},{id:2,t:'g',v:380,c:'Moradia',d:d,n:'Aluguel (parte)'},{id:3,t:'g',v:210,c:'Alimentação',d:d,n:'Mercado'},{id:4,t:'g',v:90,c:'Lazer',d:d,n:'Cinema e lanche'},{id:5,t:'g',v:120,c:'Transporte',d:d,n:'Ônibus'}];
  S.goals=[{id:1,n:'Notebook',alvo:2500,atual:300}];save();render()}
+var IMP=null;
+function num(s){s=String(s).replace(/R\$|\s/g,'');var neg=/-/.test(s)||/^\(.*\)$/.test(s);s=s.replace(/[()\-+]/g,'');if(s.indexOf(',')>-1)s=s.replace(/\./g,'').replace(',','.');var v=parseFloat(s);return isNaN(v)?null:(neg?-v:v)}
+function dt(s){s=String(s).trim();var m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);if(m)return m[3]+'-'+m[2]+'-'+m[1];m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return m[0];m=s.match(/^(\d{4})(\d{2})(\d{2})/);return m?m[1]+'-'+m[2]+'-'+m[3]:null}
+function csvRows(t){var f=t.split(/\r?\n/)[0]||'',sep=(f.split(';').length>f.split(',').length)?';':',',rows=[],r=[],c='',q=false;
+ for(var i=0;i<t.length;i++){var ch=t[i];
+  if(q){if(ch=='"'){if(t[i+1]=='"'){c+='"';i++}else q=false}else c+=ch}
+  else if(ch=='"')q=true;
+  else if(ch==sep){r.push(c);c=''}
+  else if(ch=='\n'||ch=='\r'){if(ch=='\r'&&t[i+1]=='\n')i++;r.push(c);c='';rows.push(r);r=[]}
+  else c+=ch}
+ if(c||r.length){r.push(c);rows.push(r)}
+ return rows.filter(function(x){return x.join('').trim()})}
+function parseCsv(t){var R=csvRows(t),hi=-1,ix={};
+ for(var i=0;i<Math.min(R.length,15);i++){var H=R[i].map(function(x){return x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim()});
+  var d=H.findIndex(function(x){return /^(data|date)/.test(x)}),v=H.findIndex(function(x){return /^(valor|amount|value)/.test(x)}),n=H.findIndex(function(x){return /(descri|historico|lancamento|title|memo|estabelecimento|nome)/.test(x)});
+  if(d>-1&&v>-1){hi=i;ix={d:d,v:v,n:n};break}}
+ if(hi<0)return null;
+ return R.slice(hi+1).map(function(x){var d=dt(x[ix.d]||''),v=num(x[ix.v]||'');if(!d||v===null||v===0)return null;return{d:d,v:v,n:(ix.n>-1?x[ix.n]:'')||''}}).filter(Boolean)}
+function parseOfx(t){var out=[],re=/<STMTTRN>([\s\S]*?)(?=<\/STMTTRN>|<STMTTRN>|<\/BANKTRANLIST>)/gi,m;
+ while((m=re.exec(t))){var b=m[1],g=function(k){var x=b.match(new RegExp('<'+k+'>([^<\\r\\n]*)','i'));return x?x[1].trim():''};
+  var d=dt(g('DTPOSTED')),v=num(g('TRNAMT'));if(d&&v!==null&&v!==0)out.push({d:d,v:v,n:g('MEMO')||g('NAME')})}
+ return out}
+var KW=[['Alimentação',/mercado|super|padaria|restaur|lanch|ifood|pizza|burger|acougue|hortifruti|cafe/],['Transporte',/uber|posto|combust|onibus|metro|estacion|pedagio|ipiranga|shell/],['Lazer',/netflix|spotify|cinema|steam|youtube|disney|prime|ingresso|game/],['Estudos',/faculdade|curso|escola|livraria|udemy|alura|mensalidade/],['Moradia',/aluguel|condominio|energia|agua|internet|celesc|rge|cpfl/],['Compras',/shopee|amazon|mercadolivre|magalu|americanas|loja|shein|aliexpress/]];
+function cat(n){var s=String(n).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');for(var i=0;i<KW.length;i++)if(KW[i][1].test(s))return KW[i][0];return 'Outros'}
+function readFile(f){if(!f)return;var a=new FileReader();a.onload=function(){var t=a.result;
+  if(/\uFFFD/.test(t)){var b=new FileReader();b.onload=function(){impLoad(f.name,b.result)};b.readAsText(f,'windows-1252')}else impLoad(f.name,t)};a.readAsText(f,'UTF-8')}
+function impLoad(name,t){var rows=(/\.ofx$/i.test(name)||/<OFX>/i.test(t))?parseOfx(t):parseCsv(t);
+ if(!rows||!rows.length){IMP=null;render();alert('Não consegui ler lançamentos neste arquivo. No CSV, a primeira linha precisa ter colunas como Data, Descrição e Valor.');return}
+ if(rows.length>500){rows=rows.slice(0,500);alert('O arquivo tem mais de 500 linhas. Vou importar só as primeiras 500.')}
+ IMP={rows:rows.map(function(x){return{d:x.d,v:x.v,n:String(x.n||'').trim().slice(0,40),c:cat(x.n||'')}}).filter(function(x){return !/^saldo/i.test(x.n)}),inv:false};render()}
+function vImp(){var inv=IMP.inv,R=IMP.rows,g=0,r=0;function tp(x){return (inv?x.v>0:x.v<0)?'g':'r'}
+ R.forEach(function(x){if(tp(x)==='g')g+=Math.abs(x.v);else r+=Math.abs(x.v)});
+ var h='<div class="card"><h3>Prévia da importação</h3><p class="muted">'+R.length+' lançamentos encontrados: gastos de '+brl(g)+' e receitas de '+brl(r)+'. As categorias são sugeridas automaticamente e podem ficar como "Outros".</p><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" style="width:auto;margin:0" '+(inv?'checked':'')+' onchange="IMP.inv=this.checked;render()"> Valores positivos são gastos (fatura de cartão)</label>';
+ R.slice(0,8).forEach(function(x){h+='<div class="item"><div>'+esc(x.n||'(sem descrição)')+'<div class="muted">'+x.c+' - '+x.d+'</div></div><b class="'+(tp(x)==='r'?'pos':'neg')+'">'+(tp(x)==='r'?'+':'-')+brl(Math.abs(x.v))+'</b></div>'});
+ if(R.length>8)h+='<p class="muted">... e mais '+(R.length-8)+'.</p>';
+ return h+'<div class="row" style="margin-top:12px"><button class="btn" onclick="impOk()">Importar tudo</button><button class="btn alt" onclick="IMP=null;render()">Cancelar</button></div></div>'}
+function impOk(){var seen={};S.tx.forEach(function(x){seen[x.d+'|'+x.v+'|'+x.t+'|'+(x.n||x.c)]=1});var add=0,inv=IMP.inv;
+ IMP.rows.forEach(function(x,i){var t=(inv?x.v>0:x.v<0)?'g':'r',v=Math.abs(x.v);if(seen[x.d+'|'+v+'|'+t+'|'+(x.n||x.c)])return;S.tx.push({id:Date.now()+i,t:t,v:v,c:x.c,d:x.d,n:x.n});add++});
+ var sk=IMP.rows.length-add;MES=IMP.rows.map(function(x){return x.d}).sort().pop().slice(0,7);IMP=null;save();render();
+ if(add)addXp(10,add+' lançamentos importados'+(sk?' ('+sk+' repetidos ignorados)':''));else say('Nada novo: todos já estavam registrados.')}
+var IMPCARD='<div class="card"><h3>Importar extrato</h3><p class="muted">Baixe o extrato no app do seu banco (CSV ou OFX) e envie aqui. O arquivo é lido no seu navegador; só os lançamentos viram dados da sua conta.</p><input type="file" id="fi" accept=".csv,.ofx,.txt"></div>';
 function vLanc(){
- var h='<div class="card"><h3>Novo lançamento</h3><form id="f"><div class="row"><label>Tipo<select name="t"><option value="g">Gasto</option><option value="r">Receita</option></select></label><label>Valor (R$)<input name="v" type="number" step="0.01" min="0.01" required></label></div>'+
+ var h=(IMP?vImp():IMPCARD)+'<div class="card"><h3>Novo lançamento</h3><form id="f"><div class="row"><label>Tipo<select name="t"><option value="g">Gasto</option><option value="r">Receita</option></select></label><label>Valor (R$)<input name="v" type="number" step="0.01" min="0.01" required></label></div>'+
  '<div class="row"><label>Categoria<select name="c">'+opts(CATS)+'</select></label><label>Descrição<input name="n" maxlength="40" placeholder="Ex.: almoço"></label></div><button class="btn">Salvar lançamento</button></form></div>';
  h+='<div class="card"><h3>Histórico</h3>';
  if(!S.tx.length)h+='<p class="muted">Nenhum lançamento. Cada registro vale 10 XP.</p>';
@@ -173,14 +233,17 @@ function calc(){var m=+$('#sm').value,n=+$('#sn').value,t=+$('#st').value/100;if
 function vConq(){
  return '<div class="badges">'+BD.map(function(b){var on=b[2]();return '<div class="bd'+(on?' on':'')+'"><b>'+b[0]+'</b><div class="muted">'+b[1]+'</div>'+(on?'<div class="pos">Conquistada</div>':'')+'</div>'}).join('')+'</div>'}
 function render(){head();nav();
- $('#main').innerHTML={resumo:vResumo,lanc:vLanc,metas:vMetas,missoes:vMiss,sim:vSim,conq:vConq}[tab]();
+ $('#main').innerHTML={resumo:vResumo,lanc:vLanc,metas:vMetas,limites:vLimites,missoes:vMiss,sim:vSim,conq:vConq}[tab]();
  var f=$('#f');if(f)f.onsubmit=function(e){e.preventDefault();var d=new FormData(f);
-  S.tx.push({id:Date.now(),t:d.get('t'),v:+d.get('v'),c:d.get('c'),d:today(),n:d.get('n')});save();addXp(10,'lançamento registrado');render()};
+  S.tx.push({id:Date.now(),t:d.get('t'),v:+d.get('v'),c:d.get('c'),d:today(),n:d.get('n')});save();addXp(10,'lançamento registrado');render();chk(d.get('t'),d.get('c'),+d.get('v'))};
+ var fi=$('#fi');if(fi)fi.onchange=function(){readFile(fi.files[0])};
+ var fl=$('#fl');if(fl)fl.onsubmit=function(e){e.preventDefault();var d=new FormData(fl);S.lim=S.lim||{};S.lim[d.get('c')]=+d.get('v');save();render()};
  var fg=$('#fg');if(fg)fg.onsubmit=function(e){e.preventDefault();var d=new FormData(fg);
   S.goals.push({id:Date.now(),n:d.get('n'),alvo:+d.get('a'),atual:0});save();render()};
  document.querySelectorAll('.dep').forEach(function(f){f.onsubmit=function(e){e.preventDefault();
   var g=S.goals.filter(function(x){return x.id==f.getAttribute('data-id')})[0],v=+new FormData(f).get('v'),was=g.atual>=g.alvo;
   g.atual+=v;S.dep=true;save();render();addXp(g.atual>=g.alvo&&!was?50:5,g.atual>=g.alvo&&!was?'meta concluída':'depósito na meta')}})}
+document.addEventListener('visibilitychange',function(){if(!document.hidden&&sb&&UID&&!pend)refresh()});
 start();
 </script>
 </body>
